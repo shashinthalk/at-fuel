@@ -1,0 +1,86 @@
+name: Collect prices & deploy to GitHub Pages
+
+on:
+  # Deploy whenever main changes.
+  push:
+    branches: [main]
+  # Record a price snapshot every 30 minutes, and refresh the EU national
+  # history every Tuesday (the bulletin is published on Mondays/Tuesdays).
+  # GitHub may delay scheduled runs by several minutes under load.
+  schedule:
+    - cron: '*/30 * * * *'
+    - cron: '15 7 * * 2'
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+    inputs:
+      collect:
+        description: 'Record a price snapshot before deploying'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write # commit recorded price history back to the repo
+  pages: write
+  id-token: write
+
+# Never run two collections/deploys at once (they would race on the data commit).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --include=dev
+
+      - name: Record price snapshot
+        if: github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *' || (github.event_name == 'workflow_dispatch' && inputs.collect)
+        run: npm run collect
+
+      - name: Refresh national history (EU Weekly Oil Bulletin)
+        if: github.event_name == 'schedule' && github.event.schedule == '15 7 * * 2'
+        run: npm run history:national
+
+      - name: Commit recorded data
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add public/history/
+          if git diff --cached --quiet; then
+            echo "No data changes."
+          else
+            # [skip ci] stops this commit from triggering the push workflow again.
+            git commit -m "data: price snapshot $(date -u +'%Y-%m-%d %H:%M') UTC [skip ci]"
+            git pull --rebase --autostash
+            git push
+          fi
+
+      - name: Build
+        run: npm run build
+        env:
+          # Optional: street-level photos. Mapillary client tokens are public by design.
+          VITE_MAPILLARY_TOKEN: ${{ secrets.VITE_MAPILLARY_TOKEN }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

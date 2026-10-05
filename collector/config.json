@@ -1,0 +1,15 @@
+{
+  "areas": [
+    { "name": "Bad Hall (extra wide)", "lat": 48.0347, "lon": 14.2081, "scan": "xwide" },
+    { "name": "Linz", "lat": 48.3069, "lon": 14.2858, "scan": "wide" },
+    { "name": "Burgenland", "region": { "code": 1, "type": "BL" } },
+    { "name": "Kärnten", "region": { "code": 2, "type": "BL" } },
+    { "name": "Niederösterreich", "region": { "code": 3, "type": "BL" } },
+    { "name": "Oberösterreich", "region": { "code": 4, "type": "BL" } },
+    { "name": "Salzburg", "region": { "code": 5, "type": "BL" } },
+    { "name": "Steiermark", "region": { "code": 6, "type": "BL" } },
+    { "name": "Tirol", "region": { "code": 7, "type": "BL" } },
+    { "name": "Vorarlberg", "region": { "code": 8, "type": "BL" } },
+    { "name": "Wien", "region": { "code": 9, "type": "BL" } }
+  ]
+}

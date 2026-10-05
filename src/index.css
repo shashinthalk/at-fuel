@@ -1,0 +1,166 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-bg: #f4f6fa;
+  --color-surface: #ffffff;
+  --color-sunken: #eef1f6;
+  --color-line: #e2e6ee;
+  --color-fg: #0f172a;
+  --color-muted: #64748b;
+  --color-accent: #4f46e5;
+}
+
+.dark {
+  --color-bg: #0b0f19;
+  --color-surface: #121826;
+  --color-sunken: #1a2233;
+  --color-line: #263044;
+  --color-fg: #e5e9f2;
+  --color-muted: #8a96ad;
+  --color-accent: #818cf8;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Map pins */
+.price-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: var(--pin);
+  color: #fff;
+  font: 600 11px/1.25 var(--font-mono);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+  border: 1.5px solid #fff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+.price-pin span:empty {
+  display: none;
+}
+/* Stations without a price render as a small dot */
+.price-pin:has(span:empty) {
+  padding: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.price-pin:has(span:empty)::after {
+  display: none;
+}
+.price-pin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--pin);
+  border-bottom: 0;
+}
+.price-pin.is-hover,
+.price-pin:hover {
+  transform: translate(-50%, -100%) scale(1.18);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.35);
+}
+.price-pin.is-selected {
+  transform: translate(-50%, -100%) scale(1.25);
+  box-shadow: 0 0 0 3px var(--color-accent), 0 6px 16px rgb(0 0 0 / 0.35);
+}
+.price-pin:has(span:empty).is-hover,
+.price-pin:has(span:empty).is-selected,
+.price-pin:has(span:empty):hover {
+  transform: translate(-50%, -50%) scale(1.4);
+}
+.center-pin {
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 3px solid #fff;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgb(99 102 241 / 0.5); }
+  70% { box-shadow: 0 0 0 14px rgb(99 102 241 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(99 102 241 / 0); }
+}
+.dark .leaflet-tile-pane {
+  filter: brightness(0.75) invert(1) contrast(0.9) hue-rotate(200deg) saturate(0.4);
+}
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: var(--color-sunken);
+}
+.leaflet-tooltip {
+  background: var(--color-surface);
+  color: var(--color-fg);
+  border-color: var(--color-line);
+}
+.leaflet-tooltip.station-tooltip {
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.25);
+  white-space: normal;
+}
+.leaflet-tooltip-top.station-tooltip::before,
+.leaflet-tooltip-top::before {
+  border-top-color: var(--color-surface);
+}
+.dark .leaflet-bar a {
+  background: var(--color-surface);
+  color: var(--color-fg);
+  border-color: var(--color-line);
+}
+
+/* Motion */
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slide-left {
+  from { transform: translateX(100%); }
+  to { transform: none; }
+}
+@keyframes slide-right {
+  from { transform: translateX(-100%); }
+  to { transform: none; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes toast {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-in { animation: pop-in 0.16s ease-out; }
+.drawer-in { animation: slide-left 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.sheet-in { animation: slide-right 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.fade-in { animation: fade 0.2s ease-out; }
+.toast-in { animation: toast 0.2s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
