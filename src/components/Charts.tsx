@@ -141,7 +141,7 @@ export function Charts(p: ListProps) {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card
         icon={<Trophy className="size-4" />}
         title="Price ranking"

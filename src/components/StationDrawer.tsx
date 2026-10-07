@@ -1,12 +1,15 @@
 import clsx from 'clsx'
 import { Clock, CreditCard, Globe, Mail, Navigation, Phone, Scale, Star, X } from 'lucide-react'
 import { useEffect } from 'react'
+import { useMedia } from '../hooks/useMedia'
 import { FUEL_TYPES, type FuelType } from '../api/econtrol'
 import { brandColor } from '../lib/brand'
 import { effectiveCost, type TripSettings } from '../lib/filters'
 import { DAY_LABELS_EN, viennaNow } from '../lib/hours'
 import { fmtKm, type Station } from '../lib/station'
 import { LocationGallery } from './LocationImage'
+import { useDragToClose, useScrollLock } from '../hooks/useSheet'
+import { GrabHandle } from './mobile'
 import { StationHistory } from './StationHistory'
 
 export function StationDrawer({
@@ -48,12 +51,22 @@ export function StationDrawer({
 
   const price = s.prices[fuel]
   const eff = effectiveCost(price, s.distance, trip)
+  // Phones: bottom sheet (drag the handle down to close). From 640px: side drawer.
+  const phone = useMedia('(max-width: 639px)')
+  const { ref, handle } = useDragToClose<HTMLElement>(onClose)
+  useScrollLock()
+  const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}`
 
   return (
-    <div className="fixed inset-0 z-[2000] flex justify-end" role="dialog" aria-modal>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
-      <aside className="drawer-in relative flex h-full w-full max-w-md flex-col overflow-y-auto bg-surface shadow-2xl">
-        <LocationGallery lat={s.lat} lon={s.lon} color={brandColor(s.brand)} height={210} />
+    <div className="fixed inset-0 z-[2000] flex items-end sm:items-stretch sm:justify-end" role="dialog" aria-modal>
+      <div className="fade-in absolute inset-0 bg-black/45 backdrop-blur-[2px] sm:bg-black/40 sm:backdrop-blur-[1px]" onClick={onClose} />
+      <aside
+        ref={ref}
+        className="drawer-in relative flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-[28px] bg-surface shadow-2xl sm:h-full sm:max-h-none sm:max-w-md sm:rounded-none"
+      >
+        <GrabHandle handle={handle} className="absolute inset-x-0 top-0 z-30 h-7 sm:hidden [&>span]:bg-white/80 [&>span]:shadow" />
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+        <LocationGallery lat={s.lat} lon={s.lon} color={brandColor(s.brand)} height={phone ? 170 : 210} />
         <header className="sticky top-0 z-10 border-b border-line bg-surface/95 p-4 backdrop-blur" style={{ borderTop: `3px solid ${brandColor(s.brand)}` }}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -73,14 +86,14 @@ export function StationDrawer({
                 title={inCompare ? 'Remove from comparison' : compareFull ? 'Comparison is full (4 stations)' : 'Add to comparison'}
                 aria-label={inCompare ? 'Remove from comparison' : 'Add to comparison'}
                 aria-pressed={inCompare}
-                className={clsx('rounded-lg p-2 disabled:opacity-30', inCompare ? 'bg-accent text-white' : 'hover:bg-sunken')}
+                className={clsx('rounded-full p-2 active:scale-90 disabled:opacity-30 sm:rounded-lg', inCompare ? 'bg-accent text-white' : 'bg-sunken sm:bg-transparent sm:hover:bg-sunken')}
               >
                 <Scale className="size-5" />
               </button>
-              <button type="button" onClick={onToggleFav} className="rounded-lg p-2 hover:bg-sunken" aria-label="Toggle favourite">
+              <button type="button" onClick={onToggleFav} className="rounded-full bg-sunken p-2 active:scale-90 sm:rounded-lg sm:bg-transparent sm:hover:bg-sunken" aria-label="Toggle favourite">
                 <Star className={clsx('size-5', isFav && 'fill-amber-400 text-amber-400')} />
               </button>
-              <button type="button" onClick={onClose} className="rounded-lg p-2 hover:bg-sunken" aria-label="Close">
+              <button type="button" onClick={onClose} className="rounded-full bg-sunken p-2 active:scale-90 sm:rounded-lg sm:bg-transparent sm:hover:bg-sunken" aria-label="Close">
                 <X className="size-5" />
               </button>
             </div>
@@ -116,9 +129,9 @@ export function StationDrawer({
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="hidden gap-2 sm:flex">
             <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}`}
+              href={navUrl}
               target="_blank"
               rel="noreferrer"
               className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-accent py-2 text-sm font-medium text-white hover:opacity-90"
@@ -197,6 +210,28 @@ export function StationDrawer({
                 )}
               </ul>
             </Block>
+          )}
+        </div>
+        </div>
+
+        {/* Phones: primary actions within thumb reach */}
+        <div className="pb-safe flex gap-2 border-t border-line bg-surface/95 px-4 pt-3 backdrop-blur sm:hidden">
+          <a
+            href={navUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mb-3 flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-accent/25 active:scale-[0.98]"
+          >
+            <Navigation className="size-5" /> Navigate
+          </a>
+          {r.contact?.telephone && (
+            <a
+              href={`tel:${r.contact.telephone}`}
+              aria-label="Call"
+              className="mb-3 grid w-14 place-items-center rounded-2xl bg-sunken text-fg active:scale-95"
+            >
+              <Phone className="size-5" />
+            </a>
           )}
         </div>
       </aside>

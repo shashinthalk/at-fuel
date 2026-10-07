@@ -1,7 +1,8 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { LocateFixed, MousePointerClick } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import clsx from 'clsx'
+import { Award, Clock, LocateFixed, MousePointerClick, Navigation } from 'lucide-react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Circle, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { brandColor } from '../lib/brand'
 import { priceRank, rankColor } from '../lib/filters'
@@ -48,12 +49,17 @@ function FlyToSelected({ station }: { station: Station | undefined }) {
   return null
 }
 
-function ClickToSearch({ onPick }: { onPick: (p: LatLon) => void }) {
-  useMapEvents({ click: (e) => onPick({ lat: e.latlng.lat, lon: e.latlng.lng }) })
+/** Desktop: click to search there. Touch: long-press, so a stray tap never moves the search. */
+function ClickToSearch({ onPick, longPress }: { onPick: (p: LatLon) => void; longPress?: boolean }) {
+  useMapEvents(
+    longPress
+      ? { contextmenu: (e) => onPick({ lat: e.latlng.lat, lon: e.latlng.lng }) }
+      : { click: (e) => onPick({ lat: e.latlng.lat, lon: e.latlng.lng }) },
+  )
   return null
 }
 
-function RecenterButton({ stations, center }: { stations: Station[]; center: LatLon | null }) {
+function RecenterButton({ stations, center, flat }: { stations: Station[]; center: LatLon | null; flat?: boolean }) {
   const map = useMap()
   return (
     <button
@@ -65,7 +71,11 @@ function RecenterButton({ stations, center }: { stations: Station[]; center: Lat
         const b = boundsOf(stations, center)
         if (b) map.flyToBounds(b, { padding: [48, 48], maxZoom: 14, duration: 0.6 })
       }}
-      className="absolute top-20 left-2.5 z-[500] grid size-[34px] place-items-center rounded-md border-2 border-black/20 bg-surface text-fg hover:bg-sunken"
+      className={
+        flat
+          ? 'absolute top-3 left-3 z-[500] grid size-10 place-items-center rounded-full bg-surface text-fg shadow-lg ring-1 ring-line active:scale-95'
+          : 'absolute top-20 left-2.5 z-[500] grid size-[34px] place-items-center rounded-md border-2 border-black/20 bg-surface text-fg hover:bg-sunken'
+      }
     >
       <LocateFixed className="size-4" />
     </button>
@@ -76,20 +86,22 @@ export function MapView({
   center,
   onPick,
   height = 'h-[560px]',
+  flat,
   ...p
-}: ListProps & { center: LatLon | null; onPick: (pt: LatLon) => void; height?: string }) {
+}: ListProps & { center: LatLon | null; onPick: (pt: LatLon) => void; height?: string; flat?: boolean }) {
   const selected = useMemo(() => p.stations.find((s) => s.id === p.selectedId), [p.stations, p.selectedId])
+  // `flat`: full-screen phone map — pinch to zoom, no hover tooltips, long-press to search.
   return (
-    <div className={`relative overflow-hidden rounded-2xl border border-line shadow-sm ${height}`}>
-      <MapContainer center={center ? [center.lat, center.lon] : [47.6, 13.8]} zoom={11} className="size-full" scrollWheelZoom>
+    <div className={clsx('relative overflow-hidden', !flat && 'rounded-2xl border border-line shadow-sm', height)}>
+      <MapContainer center={center ? [center.lat, center.lon] : [47.6, 13.8]} zoom={11} className="size-full" scrollWheelZoom zoomControl={!flat}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitBounds stations={p.stations} center={center} />
         <FlyToSelected station={selected} />
-        <ClickToSearch onPick={onPick} />
-        <RecenterButton stations={p.stations} center={center} />
+        <ClickToSearch onPick={onPick} longPress={flat} />
+        <RecenterButton stations={p.stations} center={center} flat={flat} />
         {center && (
           <>
             <Marker position={[center.lat, center.lon]} icon={centerIcon} zIndexOffset={-1000}>
@@ -123,6 +135,7 @@ export function MapView({
                 mouseout: () => p.onHover(null),
               }}
             >
+              {!flat && (
               <Tooltip direction="top" offset={[0, -26]} className="station-tooltip" opacity={1}>
                 <div className="w-56 overflow-hidden rounded-xl">
                   <TileImage lat={s.lat} lon={s.lon} width={224} height={110} color={brandColor(s.brand)} />
@@ -143,15 +156,23 @@ export function MapView({
                   </div>
                 </div>
               </Tooltip>
+              )}
             </Marker>
           )
         })}
       </MapContainer>
 
+      {!flat && (
       <div className="pointer-events-none absolute top-3 left-1/2 z-[500] hidden -translate-x-1/2 items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1 text-xs text-muted shadow backdrop-blur sm:flex">
         <MousePointerClick className="size-3.5" />
         Click the map to search there
       </div>
+      )}
+      {flat ? (
+        <div className="hint-out pointer-events-none absolute top-[3.75rem] left-1/2 z-[500] -translate-x-1/2 rounded-full bg-surface/85 px-3 py-1 text-[11px] whitespace-nowrap text-muted shadow backdrop-blur">
+          Long-press the map to search there
+        </div>
+      ) : (
       <div className="pointer-events-none absolute right-3 bottom-6 z-[500] rounded-xl bg-surface/90 px-3 py-2 text-xs shadow backdrop-blur">
         <div className="mb-1 font-medium">Price per litre</div>
         <div className="h-2 w-32 rounded-full" style={{ background: `linear-gradient(90deg, ${rankColor(0)}, ${rankColor(0.5)}, ${rankColor(1)})` }} />
@@ -160,6 +181,88 @@ export function MapView({
           <span>{p.max ? p.max.toFixed(3) : '—'}</span>
         </div>
       </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Phone map: swipeable station cards along the bottom. The card in view
+ * highlights its pin; tapping opens the station.
+ */
+export function MapCarousel(p: ListProps) {
+  const scroller = useRef<HTMLDivElement>(null)
+  const timer = useRef<number | undefined>(undefined)
+  const podium = [...new Set(p.stations.map((s) => s.prices[p.fuel]).filter((x): x is number => x !== undefined))].sort((a, b) => a - b).slice(0, 3)
+
+  const onScroll = () => {
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => {
+      const el = scroller.current
+      const first = el?.firstElementChild as HTMLElement | null
+      if (!el || !first) return
+      const i = Math.round(el.scrollLeft / (first.offsetWidth + 10))
+      const s = p.stations[Math.min(i, p.stations.length - 1)]
+      if (s) p.onHover(s.id)
+    }, 90)
+  }
+
+  if (!p.stations.length) return null
+  return (
+    <div
+      ref={scroller}
+      onScroll={onScroll}
+      className="no-scrollbar absolute inset-x-0 bottom-6 z-[600] flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-px-4 px-4"
+    >
+      {p.stations.map((s) => {
+        const price = s.prices[p.fuel]
+        const color = rankColor(priceRank(price, p.min, p.max))
+        const medal = price !== undefined ? podium.indexOf(price) : -1
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => p.onSelect(s)}
+            className={clsx(
+              'flex w-[min(80vw,320px)] shrink-0 snap-start items-center gap-3 rounded-2xl bg-surface/95 p-2.5 text-left shadow-xl ring-1 backdrop-blur transition-transform active:scale-[0.98]',
+              p.hoveredId === s.id ? 'ring-accent/60' : 'ring-line',
+            )}
+          >
+            <span className="relative shrink-0">
+              <TileImage lat={s.lat} lon={s.lon} width={56} height={56} zoom={18} color={brandColor(s.brand)} className="rounded-xl" lazy compact />
+              {medal >= 0 && (
+                <span className="absolute -top-1 -left-1 grid size-5 place-items-center rounded-full text-white ring-2 ring-surface" style={{ background: ['#f5b301', '#a8b3c2', '#cd7f32'][medal] }}>
+                  <Award className="size-3" />
+                </span>
+              )}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] font-semibold tracking-wide uppercase" style={{ color: brandColor(s.brand) }}>
+                {s.brand}
+              </span>
+              <span className="block truncate text-sm leading-snug font-semibold">{s.name}</span>
+              <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted">
+                {p.showDistance && (
+                  <span className="flex items-center gap-0.5">
+                    <Navigation className="size-3" />
+                    {fmtKm(s.distance)}
+                  </span>
+                )}
+                <span className={clsx('flex min-w-0 items-center gap-0.5', s.openNow === false ? 'text-rose-500' : s.openNow && 'text-emerald-600 dark:text-emerald-400')}>
+                  <Clock className="size-3 shrink-0" />
+                  <span className="truncate">{s.openLabel}</span>
+                </span>
+              </span>
+            </span>
+            <span className="shrink-0 text-right">
+              <span className="block font-mono text-lg leading-tight font-bold tabular-nums" style={{ color }}>
+                {price !== undefined ? price.toFixed(3) : '—'}
+              </span>
+              <span className="block text-[10px] text-muted">€/L</span>
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }

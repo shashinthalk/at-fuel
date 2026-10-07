@@ -120,7 +120,10 @@ function LocationSearch({ target, onChange }: { target: SearchTarget; onChange: 
         Use my location
       </button>
       {geoError && <p className="text-xs text-red-500">{geoError}</p>}
-      <p className="text-xs text-muted">Tip: click anywhere on the map to search there.</p>
+      <p className="text-xs text-muted">
+        Tip: <span className="lg:hidden">long-press</span>
+        <span className="hidden lg:inline">click</span> anywhere on the map to search there.
+      </p>
 
       <div>
         <span className="mb-1.5 block text-xs text-muted">Search area</span>

@@ -114,7 +114,7 @@ export function CompareView({
   const addable = candidates.filter((s) => !compareIds.includes(s.id) && s.prices[fuel] !== undefined).slice(0, 60)
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
       {/* ---------------- Inputs ---------------- */}
       <aside className="space-y-4 xl:sticky xl:top-[130px] xl:self-start">
         <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
@@ -235,12 +235,12 @@ export function CompareView({
               </span>
             ))}
             {picked.length < MAX_COMPARE && addable.length > 0 && (
-              <label className="relative inline-flex items-center">
+              <label className="relative inline-flex max-w-full min-w-0 items-center">
                 <Plus className="pointer-events-none absolute left-2.5 size-3.5 text-accent" />
                 <select
                   value=""
                   onChange={(e) => e.target.value && onToggle(Number(e.target.value))}
-                  className="h-9 cursor-pointer rounded-xl border border-dashed border-accent/50 bg-accent/5 pr-3 pl-7 text-sm font-medium text-accent"
+                  className="h-9 w-full max-w-full cursor-pointer truncate rounded-xl border border-dashed border-accent/50 bg-accent/5 pr-3 pl-7 text-sm font-medium text-accent"
                 >
                   <option value="">Add a station…</option>
                   {addable.map((s) => (

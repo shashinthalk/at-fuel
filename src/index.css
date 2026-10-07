@@ -25,11 +25,44 @@
   color-scheme: dark;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+button,
+a,
+select,
+[role='button'] {
+  touch-action: manipulation;
+}
+
+/* Touch devices: iOS zooms into inputs below 16px, and hover effects stick after a tap. */
+@media (max-width: 1023px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Map pins */
@@ -144,6 +177,10 @@ body {
   from { transform: translateX(-100%); }
   to { transform: none; }
 }
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
 @keyframes fade {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -156,6 +193,17 @@ body {
 .drawer-in { animation: slide-left 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .sheet-in { animation: slide-right 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .fade-in { animation: fade 0.2s ease-out; }
+/* One-off hints: visible for a few seconds, then gone. */
+@keyframes hint-out {
+  0%, 80% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+.hint-out { animation: hint-out 5s ease-in forwards; }
+.sheet-up { animation: slide-up 0.32s cubic-bezier(0.2, 0.9, 0.25, 1); }
+/* Station details: bottom sheet on phones, side drawer from 640px. */
+@media (max-width: 639px) {
+  .drawer-in { animation: slide-up 0.32s cubic-bezier(0.2, 0.9, 0.25, 1); }
+}
 .toast-in { animation: toast 0.2s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

@@ -33,6 +33,8 @@ export function HoverPreview({
   const [rect, setRect] = useState<DOMRect | null>(null)
 
   const show = () => {
+    // Touch screens fire mouseenter on tap; the details sheet opens instead.
+    if (!window.matchMedia('(hover: hover)').matches) return
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => anchor.current && setRect(anchor.current.getBoundingClientRect()), OPEN_DELAY)
   }

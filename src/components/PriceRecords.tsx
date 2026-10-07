@@ -134,7 +134,7 @@ export function PriceRecords({ fuel, now }: { fuel: FuelType; now: number }) {
       <div className="space-y-3">
         <Panel icon={<Sun className="size-4" />} title={daily ? `${daily.day === viennaParts(now).day ? 'Today' : 'Latest day'}, ${fmtDay(daily.day, { weekday: 'long', day: '2-digit', month: '2-digit' })}` : 'Today'} sub={daily && `as of ${time(daily.updatedAt)}`}>
           {today ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="grid grid-cols-3 gap-2 text-center">
                 {(
                   [
@@ -170,7 +170,7 @@ export function PriceRecords({ fuel, now }: { fuel: FuelType; now: number }) {
           )}
         </Panel>
 
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {weeks.map((w) => (
             <WeekCard key={w.week} week={w} label={WEEK_LABELS[w.week - 1] ?? `Week ${w.week}`} area={area} fuel={fuel} />
           ))}

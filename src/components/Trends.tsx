@@ -866,7 +866,7 @@ function TimePatterns({ stations, fuel, series, start, end }: { stations: Statio
       title="When is it cheapest to refuel?"
       sub="Typical price by hour and weekday compared with each station's own average — based on recorded history (Vienna time)"
     >
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
         <div>
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-sm font-medium">By hour of day</span>

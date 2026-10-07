@@ -29,12 +29,13 @@ export function StatsBar({
   }
   const saving = (stats.max - stats.min) * trip.tankLitres
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+    // Phones: one swipeable row. Wider screens: grid.
+    <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 md:mx-0 md:grid md:grid-cols-3 md:gap-3 md:overflow-visible md:px-0 xl:grid-cols-5">
       <button
         type="button"
         disabled={!cheapest}
         onClick={() => cheapest && onSelect(cheapest)}
-        className="group col-span-2 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 text-left text-white shadow-md shadow-emerald-600/20 transition-transform hover:-translate-y-0.5 md:col-span-1"
+        className="group w-[68%] shrink-0 snap-start rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-3.5 text-left text-white shadow-md shadow-emerald-600/20 transition-transform active:scale-[0.98] md:w-auto md:p-4 md:hover:-translate-y-0.5"
       >
         <div className="flex items-center justify-between text-xs font-medium text-white/85">
           <span className="flex items-center gap-1.5">
@@ -64,8 +65,8 @@ const TONES = {
 
 function Tile({ icon, label, value, sub, tone }: { icon: ReactNode; label: string; value: string; sub: string; tone: keyof typeof TONES }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-xs font-medium text-muted">
+    <div className="w-[44%] shrink-0 snap-start rounded-2xl border border-line bg-surface p-3.5 shadow-sm md:w-auto md:p-4">
+      <div className="flex items-center gap-2 text-xs font-medium whitespace-nowrap text-muted">
         <span className={clsx('grid size-6 place-items-center rounded-lg', TONES[tone])}>{icon}</span>
         {label}
       </div>

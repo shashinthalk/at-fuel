@@ -384,7 +384,7 @@ function ForecastCard({ forecast: f, metric, scopeLabel }: { forecast: ReturnTyp
             })}
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-sunken p-3">
               <div className="mb-2 text-xs font-medium text-muted">Typical weekday effect (vs. trend)</div>
               <div className="flex items-end gap-1.5">

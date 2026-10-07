@@ -5,6 +5,7 @@ import {
   ArrowUpNarrowWide,
   BarChart3,
   Check,
+  ChevronDown,
   Columns2,
   Download,
   Droplets,
@@ -13,6 +14,7 @@ import {
   History,
   LayoutGrid,
   Link2,
+  List,
   Map as MapIcon,
   MapPin,
   Moon,
@@ -21,14 +23,16 @@ import {
   Rows3,
   Scale,
   SearchX,
+  Share2,
   SlidersHorizontal,
   Sun,
   X,
 } from 'lucide-react'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { FUEL_TYPES, type FuelType } from './api/econtrol'
 import { FilterPanel } from './components/FilterPanel'
-import { MapView } from './components/MapView'
+import { MapCarousel, MapView } from './components/MapView'
+import { BottomSheet, TabBar } from './components/mobile'
 import { SearchPanel } from './components/SearchPanel'
 import { StationDrawer } from './components/StationDrawer'
 import { StationList, type ListProps } from './components/StationList'
@@ -36,6 +40,7 @@ import { StationTable } from './components/StationTable'
 import { StatsBar } from './components/StatsBar'
 import { Segmented } from './components/ui'
 import { useCompareList, useFavorites, useLocalStorage } from './hooks/useLocalStorage'
+import { useIsMobile } from './hooks/useMedia'
 import { DEFAULT_INPUTS, type CompareInputs } from './lib/compare'
 import { useStations } from './hooks/useStations'
 import { useUrlState } from './hooks/useUrlState'
@@ -77,9 +82,26 @@ export default function App() {
   const { favorites, toggle: toggleFav } = useFavorites()
   const { compareIds, toggleCompare, clearCompare } = useCompareList()
   const [compareInputs, setCompareInputs] = useLocalStorage<CompareInputs>('fuel:compareInputs', { ...DEFAULT_INPUTS, consumption: trip.consumption })
+  const isMobile = useIsMobile()
+  // Phones get one list view; split and table layouts need a wide screen.
+  const shown: View = isMobile && (view === 'split' || view === 'table') ? 'cards' : view
+  const mobileMap = isMobile && shown === 'map'
+
+  // Header height drives the sticky toolbar offset and the full-screen mobile map.
+  const headerRef = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const set = () => document.documentElement.style.setProperty('--hdr', `${el.offsetHeight}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', dark ? '#121826' : '#ffffff'))
   }, [dark])
 
   useEffect(() => {
@@ -121,6 +143,14 @@ export default function App() {
   )
 
   const share = async () => {
+    if (isMobile && navigator.share) {
+      try {
+        await navigator.share({ title: `Fuel prices · ${target.label}`, url: location.href })
+      } catch {
+        /* dismissed */
+      }
+      return
+    }
     try {
       await navigator.clipboard.writeText(location.href)
       setToast('Link copied — it includes your location and filters')
@@ -173,19 +203,34 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg text-fg">
       {/* Header */}
-      <header className="sticky top-0 z-[1100] border-b border-line bg-surface/85 backdrop-blur-xl">
+      <header ref={headerRef} className="sticky top-0 z-[1100] border-b border-line bg-surface/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1680px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none">
+            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30">
               <Fuel className="size-5" />
             </div>
-            <div className="leading-tight">
+            <div className="hidden leading-tight lg:block">
               <h1 className="font-bold tracking-tight">Spritpreis Austria</h1>
               <p className="text-[11px] text-muted">Live fuel prices · E-Control</p>
             </div>
+            {/* Phones: the location is the title; tap to search elsewhere. */}
+            <button type="button" onClick={() => setSidebar(true)} className="min-w-0 flex-1 text-left leading-tight active:opacity-70 lg:hidden">
+              <span className="flex items-center gap-1 text-[15px] font-semibold">
+                <span className="truncate">{target.label}</span>
+                <ChevronDown className="size-4 shrink-0 text-muted" />
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] text-muted">
+                <span className={clsx('size-1.5 shrink-0 rounded-full', isFetching ? 'animate-pulse bg-amber-400' : 'bg-emerald-500')} />
+                <span className="truncate">
+                  {isFetching
+                    ? `Updating ${Math.round(progress * 100)}%`
+                    : `${target.kind === 'location' ? (scanMode?.label ?? 'Nearby') : 'Region'} · ${updatedAt ? new Date(updatedAt).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' }) : '—'}`}
+                </span>
+              </span>
+            </button>
           </div>
 
-          <nav aria-label="Fuel type" className="order-last flex w-full gap-1 rounded-xl bg-sunken p-1 sm:order-none sm:w-auto">
+          <nav aria-label="Fuel type" className="order-last flex w-full gap-1 rounded-xl bg-sunken p-1 lg:order-none lg:w-auto">
             {FUEL_TYPES.map((f) => (
               <button
                 key={f.id}
@@ -193,20 +238,23 @@ export default function App() {
                 onClick={() => setFuel(f.id)}
                 aria-pressed={filters.fuel === f.id}
                 className={clsx(
-                  'flex flex-1 items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-all sm:flex-none',
+                  'flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-2 py-1.5 text-left transition-all active:scale-[0.97] lg:flex-none lg:justify-start lg:px-3',
                   filters.fuel === f.id ? 'bg-surface shadow-sm ring-1 ring-line' : 'text-muted hover:text-fg',
                 )}
               >
-                <span className={clsx(filters.fuel === f.id && 'text-accent')}>{FUEL_ICONS[f.id]}</span>
-                <span className="leading-tight">
-                  <span className="block text-sm font-medium">{f.label}</span>
+                <span className={clsx('shrink-0', filters.fuel === f.id && 'text-accent')}>{FUEL_ICONS[f.id]}</span>
+                <span className="min-w-0 leading-tight">
+                  <span className="block truncate text-sm font-medium">
+                    <span className="lg:hidden">{f.short}</span>
+                    <span className="hidden lg:inline">{f.label}</span>
+                  </span>
                   <span className="block font-mono text-[10px] text-muted tabular-nums">{fuelMins[f.id] !== undefined ? `from ${fuelMins[f.id]!.toFixed(3)}` : 'no data'}</span>
                 </span>
               </button>
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-1">
+          <div className="flex items-center gap-0.5 lg:ml-auto lg:gap-1">
             <span className="mr-1 hidden items-center gap-1.5 text-xs text-muted md:flex">
               <span className={clsx('size-2 rounded-full', isFetching ? 'animate-pulse bg-amber-400' : 'bg-emerald-500')} />
               {isFetching
@@ -218,8 +266,8 @@ export default function App() {
             <IconBtn label="Refresh prices" onClick={refetch}>
               <RefreshCw className={clsx('size-4', isFetching && 'animate-spin')} />
             </IconBtn>
-            <IconBtn label="Copy shareable link" onClick={share}>
-              <Link2 className="size-4" />
+            <IconBtn label="Share" onClick={share}>
+              {isMobile ? <Share2 className="size-4" /> : <Link2 className="size-4" />}
             </IconBtn>
             <IconBtn label={dark ? 'Light mode' : 'Dark mode'} onClick={() => setDark(!dark)}>
               {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -233,37 +281,30 @@ export default function App() {
         )}
       </header>
 
-      <div className="mx-auto flex max-w-[1680px] gap-5 px-4 py-5">
+      <div className="mx-auto flex max-w-[1680px] gap-5 px-4 pt-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:py-5">
         {/* Desktop sidebar */}
         <aside className="hidden w-[320px] shrink-0 lg:block">
           <div className="sticky top-[84px] max-h-[calc(100vh-100px)] overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-sm">{sidebarContent}</div>
         </aside>
 
-        {/* Mobile sidebar */}
+        {/* Phones & tablets: search and filters in a bottom sheet */}
         {sidebar && (
-          <div className="fixed inset-0 z-[1500] lg:hidden">
-            <div className="fade-in absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSidebar(false)} />
-            <div className="sheet-in absolute inset-y-0 left-0 flex w-[90%] max-w-sm flex-col bg-surface shadow-2xl">
-              <div className="flex items-center justify-between border-b border-line px-4 py-3">
-                <span className="flex items-center gap-2 font-semibold">
-                  <SlidersHorizontal className="size-4" /> Search & filters
-                </span>
-                <button type="button" onClick={() => setSidebar(false)} className="rounded-lg p-1.5 hover:bg-sunken" aria-label="Close">
-                  <X className="size-5" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4">{sidebarContent}</div>
-              <div className="border-t border-line p-3">
-                <button type="button" onClick={() => setSidebar(false)} className="w-full rounded-xl bg-accent py-2.5 text-sm font-semibold text-white">
-                  Show {visible.length} stations
-                </button>
-              </div>
-            </div>
-          </div>
+          <BottomSheet
+            title="Search & filters"
+            icon={<SlidersHorizontal className="size-4 text-accent" />}
+            onClose={() => setSidebar(false)}
+            footer={
+              <button type="button" onClick={() => setSidebar(false)} className="w-full rounded-2xl bg-accent py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-accent/25 active:scale-[0.98]">
+                Show {visible.length} station{visible.length === 1 ? '' : 's'}
+              </button>
+            }
+          >
+            {sidebarContent}
+          </BottomSheet>
         )}
 
         <main className="min-w-0 flex-1 space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="hidden flex-wrap items-end justify-between gap-3 lg:flex">
             <div className="min-w-0">
               <p className="text-xs font-medium tracking-wide text-muted uppercase">{target.kind === 'location' ? 'Stations around' : 'Cheapest stations in'}</p>
               <h2 className="flex items-center gap-2 truncate text-2xl font-bold tracking-tight">
@@ -302,10 +343,24 @@ export default function App() {
             <Skeleton />
           ) : (
             <>
-              <StatsBar stats={stats} cheapest={cheapest} total={fuelTotal} shown={visible.length} trip={trip} onSelect={(s) => setSelectedId(s.id)} />
+              {!mobileMap && <StatsBar stats={stats} cheapest={cheapest} total={fuelTotal} shown={visible.length} trip={trip} onSelect={(s) => setSelectedId(s.id)} />}
 
-              <div className="sticky top-[66px] z-[900] -mx-1 rounded-2xl bg-bg/85 px-1 py-2 backdrop-blur-xl sm:top-[62px]">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+              {!mobileMap && (
+              <div className="sticky top-[var(--hdr,62px)] z-[900] -mx-4 bg-bg/85 px-4 py-2 backdrop-blur-xl lg:-mx-1 lg:rounded-2xl lg:px-1">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSidebar(true)}
+                    className={clsx(
+                      'flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold active:scale-[0.97] lg:hidden',
+                      activeFilters ? 'border-accent/40 bg-accent/10 text-accent' : 'border-line bg-surface',
+                    )}
+                  >
+                    <SlidersHorizontal className="size-4" />
+                    Filters
+                    {activeFilters > 0 && <span className="grid size-5 place-items-center rounded-full bg-accent text-[11px] text-white">{activeFilters}</span>}
+                  </button>
+                  <div className="hidden lg:block">
                   <Segmented
                     size="sm"
                     value={view}
@@ -330,12 +385,13 @@ export default function App() {
                       },
                     ]}
                   />
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <select
                       aria-label="Sort by"
                       value={filters.sort}
                       onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as SortKey }))}
-                      className="h-8 rounded-lg border border-line bg-surface px-2 text-xs font-medium"
+                      className="h-9 rounded-full border border-line bg-surface px-3 text-xs font-medium lg:h-8 lg:rounded-lg lg:px-2"
                     >
                       {SORTS.filter((s) => showDistance || (s.id !== 'distance' && s.id !== 'effective')).map((s) => (
                         <option key={s.id} value={s.id}>
@@ -349,15 +405,18 @@ export default function App() {
                     >
                       {filters.sortDir === 'asc' ? <ArrowUpNarrowWide className="size-4" /> : <ArrowDownWideNarrow className="size-4" />}
                     </ToolBtn>
-                    <ToolBtn label="Export CSV" onClick={() => exportCsv(visible)} disabled={!visible.length}>
-                      <Download className="size-4" />
-                    </ToolBtn>
+                    <span className="hidden lg:contents">
+                      <ToolBtn label="Export CSV" onClick={() => exportCsv(visible)} disabled={!visible.length}>
+                        <Download className="size-4" />
+                      </ToolBtn>
+                    </span>
                   </div>
                 </div>
                 <ActiveChips filters={filters} setFilters={setFilters} />
               </div>
+              )}
 
-              {visible.length === 0 && view !== 'trends' && view !== 'compare' ? (
+              {visible.length === 0 && shown !== 'trends' && shown !== 'compare' ? (
                 <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line bg-surface p-12 text-center">
                   <span className="grid size-12 place-items-center rounded-full bg-sunken text-muted">
                     <SearchX className="size-6" />
@@ -370,13 +429,28 @@ export default function App() {
                     Clear all filters
                   </button>
                 </div>
-              ) : view === 'cards' ? (
+              ) : shown === 'cards' ? (
                 <StationList {...listProps} />
-              ) : view === 'table' ? (
+              ) : shown === 'table' ? (
                 <StationTable {...listProps} sort={filters.sort} sortDir={filters.sortDir} onSort={onSort} onFuel={setFuel} />
-              ) : view === 'map' ? (
+              ) : mobileMap ? (
+                // Full-screen map between header and tab bar, with swipeable station cards.
+                <div className="fixed inset-x-0 top-[var(--hdr,108px)] bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-[800]">
+                  <MapView {...listProps} center={center} onPick={onPick} height="h-full" flat />
+                  <button
+                    type="button"
+                    onClick={() => setSidebar(true)}
+                    className="absolute top-3 right-3 z-[500] flex h-10 items-center gap-1.5 rounded-full bg-surface px-4 text-[13px] font-semibold shadow-lg ring-1 ring-line active:scale-95"
+                  >
+                    <SlidersHorizontal className="size-4" />
+                    Filters
+                    {activeFilters > 0 && <span className="grid size-5 place-items-center rounded-full bg-accent text-[11px] text-white">{activeFilters}</span>}
+                  </button>
+                  <MapCarousel {...listProps} />
+                </div>
+              ) : shown === 'map' ? (
                 <MapView {...listProps} center={center} onPick={onPick} height="h-[calc(100vh-20rem)] min-h-[480px]" />
-              ) : view === 'compare' ? (
+              ) : shown === 'compare' ? (
                 <Suspense fallback={<Skeleton />}>
                   <CompareView
                     allStations={stations}
@@ -392,11 +466,11 @@ export default function App() {
                     onSelect={(s) => setSelectedId(s.id)}
                   />
                 </Suspense>
-              ) : view === 'trends' ? (
+              ) : shown === 'trends' ? (
                 <Suspense fallback={<Skeleton />}>
                   <Trends {...listProps} localStamp={updatedAt} />
                 </Suspense>
-              ) : view === 'charts' ? (
+              ) : shown === 'charts' ? (
                 <Suspense fallback={<Skeleton />}>
                   <Charts {...listProps} />
                 </Suspense>
@@ -423,19 +497,23 @@ export default function App() {
         </main>
       </div>
 
-      {/* Mobile filter button */}
-      <button
-        type="button"
-        onClick={() => setSidebar(true)}
-        className="fixed bottom-5 left-1/2 z-[1000] flex -translate-x-1/2 items-center gap-2 rounded-full bg-fg px-5 py-3 text-sm font-semibold text-bg shadow-xl lg:hidden"
-      >
-        <SlidersHorizontal className="size-4" />
-        Search & filters
-        {activeFilters > 0 && <span className="grid size-5 place-items-center rounded-full bg-accent text-[11px] text-white">{activeFilters}</span>}
-      </button>
+      <TabBar
+        value={shown === 'split' || shown === 'table' ? 'cards' : shown}
+        onChange={(v) => {
+          setView(v)
+          window.scrollTo({ top: 0 })
+        }}
+        tabs={[
+          { id: 'cards', label: 'Stations', icon: <List className="size-5" /> },
+          { id: 'map', label: 'Map', icon: <MapIcon className="size-5" /> },
+          { id: 'charts', label: 'Insights', icon: <BarChart3 className="size-5" /> },
+          { id: 'trends', label: 'History', icon: <History className="size-5" /> },
+          { id: 'compare', label: 'Compare', icon: <Scale className="size-5" />, badge: compareIds.length },
+        ]}
+      />
 
-      {compareIds.length > 0 && view !== 'compare' && (
-        <div className="toast-in fixed bottom-20 left-1/2 z-[1050] flex w-[min(92vw,560px)] -translate-x-1/2 items-center gap-3 rounded-2xl border border-line bg-surface/95 p-2 pl-3 shadow-2xl backdrop-blur lg:bottom-6">
+      {compareIds.length > 0 && shown !== 'compare' && !mobileMap && (
+        <div className="toast-in fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-1/2 z-[1050] flex w-[min(92vw,560px)] -translate-x-1/2 items-center gap-3 rounded-2xl border border-line bg-surface/95 p-2 pl-3 shadow-2xl backdrop-blur lg:bottom-6">
           <Scale className="size-5 shrink-0 text-accent" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">
@@ -469,7 +547,7 @@ export default function App() {
       )}
 
       {toast && (
-        <div role="status" className="toast-in fixed top-20 left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-2 rounded-xl bg-fg px-4 py-2.5 text-sm text-bg shadow-xl">
+        <div role="status" className="toast-in fixed top-[calc(var(--hdr,62px)+0.75rem)] left-1/2 z-[3000] flex -translate-x-1/2 items-center gap-2 rounded-xl bg-fg px-4 py-2.5 text-sm text-bg shadow-xl">
           <Check className="size-4 text-emerald-400" />
           {toast}
         </div>
@@ -514,13 +592,13 @@ function ActiveChips({ filters, setFilters }: { filters: Filters; setFilters: (f
   if (filters.favoritesOnly) chips.push({ label: 'Favourites', clear: (f) => ({ ...f, favoritesOnly: false }) })
   if (!chips.length) return null
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+    <div className="no-scrollbar -mx-4 mt-2 flex items-center gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0">
       {chips.map((c) => (
         <button
           key={c.label}
           type="button"
           onClick={() => setFilters(c.clear)}
-          className="group inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 py-0.5 pr-1.5 pl-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
+          className="group inline-flex shrink-0 items-center gap-1 rounded-full border border-accent/30 bg-accent/10 py-1 pr-2 pl-3 text-xs font-medium whitespace-nowrap text-accent transition-colors hover:bg-accent/20 lg:py-0.5 lg:pr-1.5 lg:pl-2.5"
         >
           {c.label}
           <X className="size-3 opacity-60 group-hover:opacity-100" />
@@ -541,7 +619,7 @@ function ActiveChips({ filters, setFilters }: { filters: Filters; setFilters: (f
 
 function IconBtn({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" title={label} aria-label={label} onClick={onClick} className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-sunken hover:text-fg">
+    <button type="button" title={label} aria-label={label} onClick={onClick} className="grid size-9 place-items-center rounded-full text-muted transition-colors hover:bg-sunken hover:text-fg active:scale-90 active:bg-sunken lg:rounded-lg">
       {children}
     </button>
   )
@@ -555,7 +633,7 @@ function ToolBtn({ label, onClick, children, disabled }: { label: string; onClic
       aria-label={label}
       onClick={onClick}
       disabled={disabled}
-      className="grid size-8 place-items-center rounded-lg border border-line bg-surface text-muted transition-colors hover:bg-sunken hover:text-fg disabled:opacity-40"
+      className="grid size-9 place-items-center rounded-full border border-line bg-surface text-muted transition-colors hover:bg-sunken hover:text-fg active:scale-90 disabled:opacity-40 lg:size-8 lg:rounded-lg"
     >
       {children}
     </button>
