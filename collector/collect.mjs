@@ -4,7 +4,8 @@
 // The API only returns *current* prices, so history has to be recorded.
 // Each run queries the areas in collector/config.json for every fuel type
 // and appends a point to a station's series only when its price changes.
-// Output: public/history/prices.json (read by the app's "Trends" view).
+// Output: public/history/prices.json (read by the app's "Trends" view), then
+// the daily / weekly / monthly summaries (see rollup.mjs).
 //
 //   npm run collect                 # one snapshot
 //   npm run collect -- --watch 30   # keep running, snapshot every 30 minutes
@@ -13,10 +14,12 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { rollup } from './rollup.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIG = join(ROOT, 'collector', 'config.json')
-const OUT = join(ROOT, 'public', 'history', 'prices.json')
+// HISTORY_DIR lets the Docker collector write to a shared volume.
+const OUT = join(process.env.HISTORY_DIR ?? join(ROOT, 'public', 'history'), 'prices.json')
 const API = 'https://api.e-control.at/sprit/1.0'
 const FUELS = ['SUP', 'DIE', 'GAS']
 const MAX_RUNS = 20000
@@ -64,10 +67,10 @@ function jobsFor(area) {
   const jobs = []
   for (const fuel of area.fuels ?? FUELS) {
     if (area.region) {
-      jobs.push({ fuel, path: '/search/gas-stations/by-region', params: { code: area.region.code, type: area.region.type, fuelType: fuel, includeClosed: true } })
+      jobs.push({ area: area.name, fuel, path: '/search/gas-stations/by-region', params: { code: area.region.code, type: area.region.type, fuelType: fuel, includeClosed: true } })
     } else {
       for (const p of scanPoints({ lat: area.lat, lon: area.lon }, area.scan)) {
-        jobs.push({ fuel, path: '/search/gas-stations/by-address', params: { latitude: p.lat.toFixed(5), longitude: p.lon.toFixed(5), fuelType: fuel, includeClosed: true } })
+        jobs.push({ area: area.name, fuel, path: '/search/gas-stations/by-address', params: { latitude: p.lat.toFixed(5), longitude: p.lon.toFixed(5), fuelType: fuel, includeClosed: true } })
       }
     }
   }
@@ -120,6 +123,8 @@ async function collect() {
     if (!Array.isArray(data)) continue
     for (const s of data) {
       if (!s?.id || !s.location) continue
+      // Areas the station was found in (for the per-area summaries); kept across runs.
+      const areas = new Set([...(store.stations[s.id]?.areas ?? []), job.area])
       store.stations[s.id] = {
         name: (s.name ?? 'Unnamed station').trim(),
         address: s.location.address,
@@ -127,6 +132,7 @@ async function collect() {
         city: s.location.city,
         lat: s.location.latitude,
         lon: s.location.longitude,
+        areas: [...areas],
       }
       const price = s.prices?.find((p) => p.fuelType === job.fuel)?.amount
       const key = `${s.id}:${job.fuel}`
@@ -165,8 +171,13 @@ async function collect() {
 const watchIdx = process.argv.indexOf('--watch')
 const intervalMin = watchIdx >= 0 ? Number(process.argv[watchIdx + 1] ?? 30) : 0
 
-await collect().catch((e) => console.error('Run failed:', e.message))
+const run = () =>
+  collect()
+    .then(rollup)
+    .catch((e) => console.error('Run failed:', e.message))
+
+await run()
 if (intervalMin > 0) {
   console.log(`Watching: next snapshot every ${intervalMin} min. Press Ctrl+C to stop.`)
-  setInterval(() => collect().catch((e) => console.error('Run failed:', e.message)), intervalMin * 60000)
+  setInterval(run, intervalMin * 60000)
 }

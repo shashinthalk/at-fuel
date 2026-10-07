@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { buildHistory, loadCollected, loadNational } from '../lib/historyData'
+import { buildHistory, loadCollected, loadDaily, loadMonths, loadNational, loadWeeks } from '../lib/historyData'
 
 /** Recorded station price history (collector file + this browser's own observations). */
 export function useHistoryData(localStamp = 0) {
@@ -22,4 +22,18 @@ export function useHistoryData(localStamp = 0) {
 /** Official weekly national averages (EU Weekly Oil Bulletin). */
 export function useNationalHistory() {
   return useQuery({ queryKey: ['history', 'national'], queryFn: loadNational, staleTime: Infinity })
+}
+
+/** Daily / weekly / monthly summaries per area (collector/rollup.mjs). */
+export function usePriceRecords() {
+  const opts = { staleTime: 5 * 60 * 1000, refetchInterval: 5 * 60 * 1000 }
+  const daily = useQuery({ queryKey: ['history', 'daily'], queryFn: loadDaily, ...opts })
+  const weeks = useQuery({ queryKey: ['history', 'weeks'], queryFn: loadWeeks, ...opts })
+  const months = useQuery({ queryKey: ['history', 'months'], queryFn: loadMonths, ...opts })
+  return {
+    daily: daily.data ?? null,
+    weeks: weeks.data ?? [],
+    months: months.data ?? null,
+    isLoading: daily.isLoading || weeks.isLoading || months.isLoading,
+  }
 }

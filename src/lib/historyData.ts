@@ -26,6 +26,49 @@ export interface NationalFile {
   weeks: { d: string; at95: number | null; atDie: number | null; eu95: number | null; euDie: number | null }[]
 }
 
+// Summaries written by collector/rollup.mjs, keyed by area name then fuel type.
+export interface StationRef {
+  id: number
+  name: string
+  city: string
+}
+
+export interface DaySummary {
+  low: number
+  lowAt: string // ISO time the lowest price started
+  lowStation: StationRef
+  avg: number
+  high: number
+  stations: number
+  partial: boolean
+}
+
+export interface LowestDay {
+  day: string // YYYY-MM-DD (Vienna)
+  price: number
+  at: string
+  station: StationRef
+}
+
+type ByArea<T> = Record<string, Partial<Record<FuelType, T>>>
+
+export interface DailyFile {
+  day: string
+  updatedAt: string
+  areas: ByArea<DaySummary & { cheapestNow: (StationRef & { price: number })[] }>
+}
+
+export interface WeekFile {
+  week: number // 1 = this week
+  start: string // Monday
+  end: string // Sunday
+  areas: ByArea<{ lowest: LowestDay | null; days: (DaySummary & { day: string; weekday: number })[] }>
+}
+
+export interface MonthsFile {
+  months: Record<string, { areas: ByArea<{ lowest: LowestDay | null; highest: { day: string; price: number }; avg: number; days: number; daily: Record<string, number> }> }>
+}
+
 export interface HistoryData {
   series: Map<string, Point[]>
   stations: CollectedFile['stations']
@@ -50,6 +93,10 @@ async function fetchJson<T>(url: string): Promise<T | null> {
 // BASE_URL keeps these working when the app is served from a sub-path (GitHub Pages).
 export const loadCollected = () => fetchJson<CollectedFile>(`${import.meta.env.BASE_URL}history/prices.json`)
 export const loadNational = () => fetchJson<NationalFile>(`${import.meta.env.BASE_URL}history/national.json`)
+export const loadDaily = () => fetchJson<DailyFile>(`${import.meta.env.BASE_URL}history/daily.json`)
+export const loadWeeks = async () =>
+  (await Promise.all([1, 2, 3, 4].map((n) => fetchJson<WeekFile>(`${import.meta.env.BASE_URL}history/weeks/week-${n}.json`)))).filter((w): w is WeekFile => !!w)
+export const loadMonths = () => fetchJson<MonthsFile>(`${import.meta.env.BASE_URL}history/months.json`)
 
 export function buildHistory(collected: CollectedFile | null): HistoryData {
   const series = new Map<string, Point[]>()

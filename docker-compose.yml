@@ -1,0 +1,29 @@
+# Deploy on Coolify: New Resource → Docker Compose → paste this file (or point it at the repo).
+# Assign your domain to the `web` service, port 80.
+services:
+  web:
+    image: ghcr.io/shashinthalk/at-fuel:latest
+    restart: unless-stopped
+    environment:
+      # Coolify: routes a generated domain to port 80 (change it under the service's Domains).
+      - SERVICE_FQDN_WEB_80
+    expose:
+      - "80"
+    volumes:
+      - history:/usr/share/nginx/html/history
+
+  collector:
+    image: ghcr.io/shashinthalk/at-fuel:latest
+    restart: unless-stopped
+    # Snapshot all areas in collector/config.json every 30 minutes, then rebuild
+    # daily.json, weeks/week-1..4.json and months.json.
+    command: sh -c "/docker-entrypoint.d/05-seed-history.sh && exec node /app/collector/collect.mjs --watch 30"
+    environment:
+      - HISTORY_DIR=/usr/share/nginx/html/history
+    volumes:
+      - history:/usr/share/nginx/html/history
+    healthcheck:
+      disable: true
+
+volumes:
+  history:

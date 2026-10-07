@@ -32,6 +32,7 @@ import {
 } from 'recharts'
 import { FUEL_TYPES, type FuelType } from '../api/econtrol'
 import { useHistoryData, useNationalHistory } from '../hooks/useHistoryData'
+import { PriceRecords } from './PriceRecords'
 import { WeeklyAnalysis } from './WeeklyAnalysis'
 import { brandColor } from '../lib/brand'
 import {
@@ -229,6 +230,8 @@ export function Trends(p: ListProps & { localStamp: number }) {
   return (
     <div className="space-y-4">
       <DataStatus history={history} now={now} />
+
+      <PriceRecords fuel={p.fuel} now={now} />
 
       <WeeklyAnalysis stations={pricedStations} fuel={p.fuel} series={history.series} now={now} onSelect={p.onSelect} />
 

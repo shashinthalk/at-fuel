@@ -33,6 +33,22 @@ npm run history:national        # refresh weekly national averages (EU Oil Bulle
 
 Snapshots are stored in `public/history/prices.json` (only price *changes* are saved). Edit `collector/config.json` to choose which areas are recorded.
 
+After every snapshot the collector also writes summaries per area (each entry in `collector/config.json`, plus "All areas") and fuel type:
+
+| File | Contents |
+| --- | --- |
+| `public/history/daily.json` | Today: lowest / average / highest price, when and where the lowest was, and the 5 cheapest stations right now |
+| `public/history/weeks/week-1.json` … `week-4.json` | This week and the 3 before (Mon–Sun): each day's prices and the day with the lowest price |
+| `public/history/months.json` | Every month: the day with the lowest price, how much, and at which station |
+
+They are rebuilt from `prices.json` on each run (`npm run history:rollup` does it on its own). Pick the area in the History view under "Lowest prices by day, week and month".
+
+Without GitHub Actions, a local cron job does the same, e.g. every 30 minutes (`crontab -e`):
+
+```cron
+*/30 * * * * cd /path/to/fuel-app && /usr/local/bin/node collector/collect.mjs >> collector.log 2>&1
+```
+
 Once the site is on GitHub Pages, the GitHub Actions workflow records snapshots for you — don't also run the collector locally and commit its output, or the data commits will conflict.
 
 ### Optional: street-level photos
@@ -44,7 +60,7 @@ Copy `.env.example` to `.env` and set `VITE_MAPILLARY_TOKEN` (free client token 
 The workflow in `.github/workflows/deploy.yml`:
 
 - builds and deploys the site on every push to `main`,
-- records a price snapshot every 30 minutes and commits it (so history keeps growing while your computer is off), then redeploys,
+- records a price snapshot every 30 minutes, updates the daily / weekly / monthly summaries and commits them (so history keeps growing while your computer is off), then redeploys,
 - refreshes the national EU data every Tuesday.
 
 Setup (once):
@@ -61,6 +77,19 @@ Notes:
 - GitHub may delay scheduled runs by several minutes, and pauses scheduled workflows in repositories with no activity for 60 days.
 - Public repositories get unlimited Actions minutes. In a private repository, a run every 30 minutes uses roughly 2,000+ minutes a month — change the cron to hourly (`0 * * * *`) to stay within the free tier.
 - After the workflow has committed data, run `git pull` before pushing your own changes.
+
+## Docker / Coolify
+
+`.github/workflows/docker.yml` builds an image on every push to `main` (and on `v*` tags) and pushes it to `ghcr.io/shashinthalk/at-fuel` (`latest`, `sha-<commit>`, and the version for tags), for amd64 and arm64.
+
+`docker-compose.yml` runs that image twice:
+
+- **web**: nginx serving the site on port 80.
+- **collector**: records a snapshot every 30 minutes and rebuilds `daily.json`, `weeks/` and `months.json`.
+
+Both share the `history` volume. On first start it is filled with the history in the image, after that the container keeps recording on its own.
+
+On Coolify: **New Resource → Docker Compose**, paste `docker-compose.yml` (or select this repository), set your domain on the `web` service with port 80, deploy. If the GitHub package is private, either make it public (GitHub → Packages → at-fuel → Package settings → Change visibility) or add `ghcr.io` credentials in Coolify (a personal access token with `read:packages`). To pick up a new image, redeploy in Coolify (or enable its webhook).
 
 ## Data sources
 

@@ -50,6 +50,12 @@ jobs:
         if: github.event_name == 'schedule' && github.event.schedule == '15 7 * * 2'
         run: npm run history:national
 
+      # Rebuild the daily / weekly / monthly summaries. `collect` already does this;
+      # this also covers manual runs without a snapshot.
+      - name: Update price summaries
+        if: github.event_name != 'push'
+        run: npm run history:rollup
+
       - name: Commit recorded data
         if: github.event_name != 'push'
         run: |
